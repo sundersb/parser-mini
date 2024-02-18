@@ -1,0 +1,26 @@
+{
+  "name": "@sundersb/parser-mini",
+  "version": "1.0.0",
+  "description": "Minimalistic text parser library",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha *-test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:sundersb/parser-mini.git"
+  },
+  "keywords": [
+    "parse"
+  ],
+  "author": "Alexander Belkov",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sundersb/parser-mini/issues"
+  },
+  "homepage": "https://github.com/sundersb/parser-mini#readme",
+  "devDependencies": {
+    "mocha": "^10.3.0",
+    "chai": "^4.3.10"
+  }
+}
