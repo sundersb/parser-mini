@@ -15,6 +15,8 @@ npm install --save @sundersb/parser-mini
 ~~~js
 const Parser = require('@sundersb/parser-mini');
 
+const join = cs => cs.join('');
+
 const lineBreakParser = Parser
     .char('\n')
     .or(Parser.string('\r\n'));
@@ -41,4 +43,4 @@ expect(untilSpaceParser.parseText('some text')).to.deep.equal({
 
 ## See also
 
-* @sundersb/markdown-mini
+* [@sundersb/markdown-mini](https://www.npmjs.com/package/@sundersb/markdown-mini)

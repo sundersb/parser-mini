@@ -3,28 +3,28 @@
 const { assert } = require("console");
 
 /**
- * @callback Predicate
+ * @callback Predicate Testing function
  * @param {string} text Text to test
  * @returns {boolean}
  */
 
 /**
  * @template A
- * @typedef {object} Just<A>
+ * @typedef {object} Just<A> Pair of parsed value and the unparsed rest of the text
  * @property {T} parsed Parsed value
  * @property {string} rest Rest of the text being parsed
  * 
- * @typedef {Just<A>|undefined} Maybe<A>
+ * @typedef {Just<A>|undefined} Maybe<A> Parsing result which may either succeed or fail
  */
 
 /**
  * @template A,B
  * 
  * @callback ParseFunction Text parsing function
- * @param {Just<A>} input Parse result of the previous parser
+ * @param {Just<A>} input Result of the previous parser
  * @returns {Maybe<B>}
  * 
- * @callback Mapper<A,B> Map one multitude to another
+ * @callback Mapper<A,B> Map one value to another
  * @param {A} value Value to map
  * @returns {B}
  */
@@ -34,7 +34,7 @@ const notEmptyObject = o => o && typeof o == 'object';
 /**
  * Parser class
  * @template A,B
- * @param {ParseFunction<A,B>} parse 
+ * @param {ParseFunction<A,B>} parse Parsing function
  */
 function Parser(parse) {
     this._parse = parse;
@@ -50,6 +50,17 @@ function Parser(parse) {
      * Save parse result as a property
      * @param {string} key Name of the property under which the parse result should be saved
      * @returns {Parser<A,Record<string,B> & { key: B}>}
+     * @example
+     * ~~~js
+     * const prefixParser = Parser.string('the').save('prefix');
+     * 
+     * const actual = prefixParser.parseText('the table');
+     * 
+     * expect(actual).to.deep.equal({
+     *     parsed: { prefix: 'the' },
+     *     rest: ' table'
+     * });
+     * ~~~
      */
     this.save = key => {
         const internal = input => {
@@ -78,13 +89,20 @@ function Parser(parse) {
      * ~~~js
      * const parser = Parser
      *     // Left parser counts # characters and save their number in the 'level' property:
-     *     .char('#').many().fmap(cs => cs.length).save('level')
+     *     .char('#').many(1).fmap(cs => cs.length).save('level')
      * 
      *     // Right parser decodes all the rest of the string and saves result in 'content':
-     *     .bind(innerParser.save('content'))
+     *     .bind(untilLineBreakParser.save('content'));
      * 
-     *     // The `data` contains both properties fused: `{ level: 2, content: [...] }`
-     *     .fmap(data => new Header(data.level, data.content));
+     * const actual = parser.parseText('## Lorem ipsum\ndolor sit amet');
+     * 
+     * expect(actual).to.deep.equal({
+     *     parsed: {
+     *         level: 2,
+     *         content: ' Lorem ipsum'
+     *     },
+     *     rest: '\ndolor sit amet'
+     * });
      * ~~~
      */
     this.bind = next => {
@@ -231,7 +249,7 @@ function Parser(parse) {
      * ~~~js
      * const parser = exactQuote
      *     .seq(untilQuote)   // return this text only
-     *     .pass(exactQuote); // make sure the closing quote exists but discard it
+     *     .pass(exactQuote); // make sure the closing quote exists but skip it
      * ~~~
      */
     this.pass = next => {
@@ -264,11 +282,13 @@ function Parser(parse) {
      * Repeat modifier
      * @param {number} [min] Minimal allowed iteration. Ignored if zero.
      * @param {number} [max] Maximal allowed iterations. Ignored if zero.
-     * @param {Predicate} [condition] Auxilliary condition to go on (when needed).
+     * @param {Predicate} [condition] Auxilliary condition to go on (when needed)
      * @returns {Parser<A,B[]>}
      * @description Repeats the parser several times
      * @example
      * ~~~js
+     * const isDigit = c => '0123456789'.includes(c);
+     * 
      * // Much the same as /^\d+\. +(.*)/
      * const orderedItemParser = Parser
      *     .sat(isDigit).many(1)
@@ -320,8 +340,9 @@ function Parser(parse) {
      * @template C
      * @param {Mapper<B,C>} mapper Mapper
      * @returns {Parser<A,C>}
-     * @description Turns `Parser` to functor purely mapping its' result.
-     * General placed in the end of the Parser's fluent expression.
+     * @description Maps parsed result's internal value into other value.
+     * This method is generally placed in the end of the Parser's fluent expression to compile
+     * parsing result to needed format.
      * @example
      * ~~~js
      * const unorderedParser = Parser
@@ -386,7 +407,7 @@ Parser.item = () => {
 
 /**
  * Make parser which consumes only this given character
- * @param {string} c Character
+ * @param {string} c Template character
  * @returns {Parser<any,string>}
  */
 Parser.char = c => {
@@ -400,10 +421,16 @@ Parser.char = c => {
 };
 
 /**
- * Make parser which consumes single char which matches `condition`
+ * Make parser which consumes single char if condition over it is met
  * @param {Predicate} condition Condition
  * @returns {Parser<any,string>}
  * @description `sat` means "satisfy"
+ * @example
+ * ~~~js
+ * const isSpace = c => ' \t\r\n'.includes(c);
+ * 
+ * const spaceParser = Parser.sat(isSpace);
+ * ~~~
  */
 Parser.sat = condition => {
     const internal = input => { 
@@ -454,7 +481,7 @@ Parser.all = () => {
 };
 
 /**
- * Make parser which suceeds when input is empty
+ * Make parser which succeeds when input is empty
  * @returns {Parser<any,boolean>}
  */
 Parser.end = () => {
@@ -527,9 +554,9 @@ Parser.brackets = (left, right) => {
 /**
  * Make content parser which returns array of parsed elements with non parsed text fragments mapped to required type
  * @template A,B
- * @param {Parser<A,B>} elementParser 
- * @param {Mapper<string,B>} fromText 
- * @param {Predicate} condition 
+ * @param {Parser<A,B>} elementParser Parser for a fit and sound element
+ * @param {Mapper<string,B>} fromText Mapper to apply on the unparsed text fragments to make a fallback element
+ * @param {Predicate} condition The parser repeats as long this condition succeeds on the rest of the text
  * @returns {Parser<A,B[]>}
  */
 Parser.repeat = (elementParser, fromText, condition) => {
